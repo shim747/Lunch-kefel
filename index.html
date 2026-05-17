@@ -1,0 +1,1045 @@
+<!DOCTYPE html>
+<html lang="he" dir="rtl">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+<meta name="theme-color" content="#1a0a3e">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<title>לוח הכפל - משחק מטבעות</title>
+<link rel="manifest" href="manifest.json">
+<script>
+  if ('serviceWorker' in navigator) {
+    navigator.serviceWorker.register('./sw.js');
+  }
+</script>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Fredoka+One&family=Rubik:wght@400;600;700;900&display=swap');
+
+  :root {
+    --gold: #ffd700;
+    --gold-dark: #b8860b;
+    --gold-light: #fff4a3;
+    --purple-deep: #1a0a3e;
+    --purple-mid: #2d1463;
+    --purple-bright: #6a2fd4;
+    --purple-glow: #9b59f5;
+    --teal: #00d4aa;
+    --teal-dark: #00a080;
+    --red: #ff4757;
+    --green: #2ed573;
+    --white: #f0eaff;
+    --coin-size: 56px;
+  }
+
+  * { box-sizing: border-box; margin: 0; padding: 0; -webkit-tap-highlight-color: transparent; }
+
+  body {
+    font-family: 'Rubik', sans-serif;
+    background: var(--purple-deep);
+    color: var(--white);
+    min-height: 100dvh;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: flex-start;
+    overflow-x: hidden;
+    position: relative;
+  }
+
+  /* Starfield background */
+  body::before {
+    content: '';
+    position: fixed;
+    inset: 0;
+    background:
+      radial-gradient(ellipse at 20% 50%, rgba(106,47,212,0.3) 0%, transparent 60%),
+      radial-gradient(ellipse at 80% 20%, rgba(0,212,170,0.15) 0%, transparent 50%),
+      radial-gradient(ellipse at 50% 100%, rgba(155,89,245,0.2) 0%, transparent 60%);
+    pointer-events: none;
+    z-index: 0;
+  }
+
+  .stars {
+    position: fixed;
+    inset: 0;
+    pointer-events: none;
+    z-index: 0;
+    overflow: hidden;
+  }
+  .star {
+    position: absolute;
+    background: white;
+    border-radius: 50%;
+    animation: twinkle var(--d) ease-in-out infinite;
+  }
+  @keyframes twinkle {
+    0%, 100% { opacity: 0.1; transform: scale(1); }
+    50% { opacity: 0.9; transform: scale(1.4); }
+  }
+
+  .app {
+    position: relative;
+    z-index: 1;
+    width: 100%;
+    max-width: 480px;
+    min-height: 100dvh;
+    display: flex;
+    flex-direction: column;
+    padding: 0 16px 24px;
+  }
+
+  /* ===== HEADER ===== */
+  .header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 16px 0 12px;
+  }
+
+  .header-title {
+    font-family: 'Fredoka One', cursive;
+    font-size: 1.6rem;
+    background: linear-gradient(135deg, var(--gold), var(--gold-light), var(--gold));
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+    text-shadow: none;
+    filter: drop-shadow(0 0 8px rgba(255,215,0,0.4));
+  }
+
+  .coin-display {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    background: rgba(255,215,0,0.12);
+    border: 1.5px solid rgba(255,215,0,0.35);
+    border-radius: 999px;
+    padding: 8px 16px;
+    cursor: pointer;
+    transition: transform 0.15s;
+  }
+  .coin-display:active { transform: scale(0.95); }
+
+  .coin-icon { font-size: 1.4rem; animation: spin-coin 3s ease-in-out infinite; }
+  @keyframes spin-coin {
+    0%, 100% { transform: rotateY(0deg); }
+    40% { transform: rotateY(180deg); }
+    50% { transform: rotateY(180deg); }
+    90% { transform: rotateY(360deg); }
+  }
+
+  .coin-count {
+    font-family: 'Fredoka One', cursive;
+    font-size: 1.4rem;
+    color: var(--gold);
+  }
+
+  /* ===== SCREENS ===== */
+  .screen { display: none; flex-direction: column; align-items: center; flex: 1; }
+  .screen.active { display: flex; }
+
+  /* ===== HOME SCREEN ===== */
+  .home-hero {
+    text-align: center;
+    margin: 24px 0 32px;
+  }
+  .home-hero .emoji { font-size: 5rem; display: block; margin-bottom: 12px; animation: float 3s ease-in-out infinite; }
+  @keyframes float { 0%,100%{transform:translateY(0)} 50%{transform:translateY(-10px)} }
+
+  .home-hero h2 {
+    font-family: 'Fredoka One', cursive;
+    font-size: 1.9rem;
+    color: var(--gold-light);
+    margin-bottom: 8px;
+  }
+  .home-hero p { color: rgba(240,234,255,0.7); font-size: 1rem; line-height: 1.5; }
+
+  .table-select-label {
+    font-size: 1rem;
+    font-weight: 600;
+    color: var(--gold-light);
+    margin-bottom: 12px;
+    align-self: flex-start;
+  }
+
+  .table-grid {
+    display: grid;
+    grid-template-columns: repeat(5, 1fr);
+    gap: 10px;
+    width: 100%;
+    margin-bottom: 28px;
+  }
+
+  .table-btn {
+    aspect-ratio: 1;
+    border-radius: 14px;
+    border: 2px solid rgba(255,215,0,0.25);
+    background: rgba(255,255,255,0.05);
+    color: var(--white);
+    font-family: 'Fredoka One', cursive;
+    font-size: 1.3rem;
+    cursor: pointer;
+    transition: all 0.2s;
+    position: relative;
+    overflow: hidden;
+  }
+  .table-btn:active { transform: scale(0.92); }
+  .table-btn.selected {
+    background: linear-gradient(135deg, var(--purple-bright), var(--purple-glow));
+    border-color: var(--gold);
+    box-shadow: 0 0 16px rgba(155,89,245,0.5);
+    color: white;
+  }
+  .table-btn .star-badge {
+    position: absolute;
+    top: 2px;
+    left: 4px;
+    font-size: 0.55rem;
+    opacity: 0;
+  }
+  .table-btn.mastered .star-badge { opacity: 1; }
+
+  .btn-all {
+    grid-column: span 5;
+    aspect-ratio: auto;
+    padding: 12px;
+    border-radius: 14px;
+    border: 2px solid rgba(0,212,170,0.4);
+    background: rgba(0,212,170,0.08);
+    color: var(--teal);
+    font-family: 'Fredoka One', cursive;
+    font-size: 1.1rem;
+    cursor: pointer;
+    transition: all 0.2s;
+  }
+  .btn-all.selected {
+    background: linear-gradient(135deg, var(--teal-dark), var(--teal));
+    color: white;
+    border-color: white;
+  }
+
+  .start-btn {
+    width: 100%;
+    padding: 18px;
+    border-radius: 20px;
+    border: none;
+    background: linear-gradient(135deg, var(--gold-dark), var(--gold), var(--gold-light));
+    color: var(--purple-deep);
+    font-family: 'Fredoka One', cursive;
+    font-size: 1.5rem;
+    cursor: pointer;
+    box-shadow: 0 6px 24px rgba(255,215,0,0.35), 0 0 0 4px rgba(255,215,0,0.1);
+    transition: all 0.2s;
+    letter-spacing: 0.5px;
+  }
+  .start-btn:active { transform: scale(0.97); box-shadow: 0 2px 12px rgba(255,215,0,0.3); }
+
+  /* ===== GAME SCREEN ===== */
+  .progress-bar-wrap {
+    width: 100%;
+    height: 8px;
+    background: rgba(255,255,255,0.1);
+    border-radius: 99px;
+    margin: 12px 0 20px;
+    overflow: hidden;
+  }
+  .progress-bar-fill {
+    height: 100%;
+    background: linear-gradient(90deg, var(--teal), var(--gold));
+    border-radius: 99px;
+    transition: width 0.4s ease;
+  }
+
+  .question-card {
+    width: 100%;
+    background: linear-gradient(145deg, rgba(45,20,99,0.8), rgba(26,10,62,0.9));
+    border: 1.5px solid rgba(155,89,245,0.4);
+    border-radius: 28px;
+    padding: 32px 24px 28px;
+    text-align: center;
+    box-shadow: 0 8px 32px rgba(0,0,0,0.4), inset 0 1px 0 rgba(255,255,255,0.08);
+    margin-bottom: 24px;
+    position: relative;
+    overflow: hidden;
+  }
+  .question-card::before {
+    content: '';
+    position: absolute;
+    top: -40%;
+    right: -20%;
+    width: 200px;
+    height: 200px;
+    border-radius: 50%;
+    background: radial-gradient(circle, rgba(106,47,212,0.25) 0%, transparent 70%);
+    pointer-events: none;
+  }
+
+  .question-num-label {
+    font-size: 0.8rem;
+    color: rgba(240,234,255,0.5);
+    margin-bottom: 4px;
+    letter-spacing: 1px;
+    text-transform: uppercase;
+  }
+
+  .question-text {
+    font-family: 'Fredoka One', cursive;
+    font-size: 3.2rem;
+    color: white;
+    margin: 8px 0 4px;
+    line-height: 1;
+  }
+
+  .question-eq { color: var(--gold); }
+
+  .streak-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    background: rgba(255,100,50,0.15);
+    border: 1px solid rgba(255,100,50,0.4);
+    border-radius: 99px;
+    padding: 4px 12px;
+    font-size: 0.85rem;
+    color: #ff8c42;
+    margin-top: 10px;
+    font-weight: 600;
+    transition: all 0.3s;
+  }
+  .streak-badge.hidden { opacity: 0; }
+
+  .answers-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 12px;
+    width: 100%;
+    margin-bottom: 20px;
+  }
+
+  .answer-btn {
+    padding: 20px 12px;
+    border-radius: 18px;
+    border: 2px solid rgba(255,255,255,0.12);
+    background: rgba(255,255,255,0.05);
+    color: var(--white);
+    font-family: 'Fredoka One', cursive;
+    font-size: 1.8rem;
+    cursor: pointer;
+    transition: all 0.18s;
+    position: relative;
+    overflow: hidden;
+  }
+  .answer-btn:active { transform: scale(0.94); }
+  .answer-btn.correct {
+    background: linear-gradient(135deg, #1a6644, var(--green));
+    border-color: var(--green);
+    box-shadow: 0 0 20px rgba(46,213,115,0.4);
+    animation: pulse-correct 0.4s ease;
+  }
+  .answer-btn.wrong {
+    background: linear-gradient(135deg, #6b0f1a, var(--red));
+    border-color: var(--red);
+    animation: shake 0.4s ease;
+  }
+  @keyframes pulse-correct {
+    0% { transform: scale(1); }
+    50% { transform: scale(1.06); }
+    100% { transform: scale(1); }
+  }
+  @keyframes shake {
+    0%,100% { transform: translateX(0); }
+    25% { transform: translateX(-6px); }
+    75% { transform: translateX(6px); }
+  }
+
+  .skip-btn {
+    background: none;
+    border: none;
+    color: rgba(240,234,255,0.35);
+    font-size: 0.85rem;
+    font-family: 'Rubik', sans-serif;
+    cursor: pointer;
+    padding: 8px;
+    text-decoration: underline;
+  }
+
+  /* ===== FEEDBACK OVERLAY ===== */
+  .feedback-overlay {
+    position: fixed;
+    inset: 0;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    z-index: 100;
+    pointer-events: none;
+    opacity: 0;
+    transition: opacity 0.2s;
+  }
+  .feedback-overlay.show { opacity: 1; pointer-events: all; }
+
+  .feedback-emoji {
+    font-size: 5rem;
+    animation: pop-in 0.3s cubic-bezier(0.34,1.56,0.64,1);
+  }
+  @keyframes pop-in { from{transform:scale(0)} to{transform:scale(1)} }
+
+  .feedback-text {
+    font-family: 'Fredoka One', cursive;
+    font-size: 2rem;
+    color: var(--gold);
+    margin-top: 12px;
+    text-shadow: 0 0 20px rgba(255,215,0,0.6);
+  }
+
+  /* ===== COIN RAIN ===== */
+  .coin-rain {
+    position: fixed;
+    inset: 0;
+    pointer-events: none;
+    z-index: 200;
+    overflow: hidden;
+  }
+  .coin-particle {
+    position: absolute;
+    font-size: 1.8rem;
+    animation: fall-coin var(--speed) ease-in forwards;
+    top: -60px;
+  }
+  @keyframes fall-coin {
+    0% { transform: translateY(0) rotate(0deg); opacity: 1; }
+    100% { transform: translateY(110vh) rotate(var(--rot)); opacity: 0.3; }
+  }
+
+  /* ===== RESULTS SCREEN ===== */
+  .results-card {
+    width: 100%;
+    background: linear-gradient(145deg, rgba(45,20,99,0.9), rgba(26,10,62,0.95));
+    border: 2px solid rgba(255,215,0,0.3);
+    border-radius: 28px;
+    padding: 32px 24px;
+    text-align: center;
+    margin: 16px 0 24px;
+    box-shadow: 0 12px 40px rgba(0,0,0,0.5);
+  }
+
+  .results-crown { font-size: 4rem; animation: float 2s ease-in-out infinite; display: block; margin-bottom: 8px; }
+
+  .results-title {
+    font-family: 'Fredoka One', cursive;
+    font-size: 2rem;
+    background: linear-gradient(135deg, var(--gold), var(--gold-light));
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+    margin-bottom: 24px;
+  }
+
+  .results-stats {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 12px;
+    margin-bottom: 24px;
+  }
+
+  .stat-box {
+    background: rgba(255,255,255,0.05);
+    border: 1px solid rgba(255,255,255,0.1);
+    border-radius: 16px;
+    padding: 14px 10px;
+  }
+  .stat-num {
+    font-family: 'Fredoka One', cursive;
+    font-size: 2rem;
+    color: var(--gold);
+    display: block;
+  }
+  .stat-label { font-size: 0.78rem; color: rgba(240,234,255,0.6); margin-top: 2px; }
+
+  .total-coins-row {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 12px;
+    background: rgba(255,215,0,0.1);
+    border: 1.5px solid rgba(255,215,0,0.35);
+    border-radius: 16px;
+    padding: 16px;
+    margin-bottom: 8px;
+  }
+  .total-coins-label { font-size: 1rem; color: var(--gold-light); }
+  .total-coins-num {
+    font-family: 'Fredoka One', cursive;
+    font-size: 2.2rem;
+    color: var(--gold);
+  }
+
+  .coins-earned-note { font-size: 0.85rem; color: rgba(240,234,255,0.5); margin-bottom: 24px; }
+
+  .results-btns { display: flex; flex-direction: column; gap: 12px; width: 100%; }
+
+  .btn-primary {
+    padding: 16px;
+    border-radius: 18px;
+    border: none;
+    background: linear-gradient(135deg, var(--gold-dark), var(--gold));
+    color: var(--purple-deep);
+    font-family: 'Fredoka One', cursive;
+    font-size: 1.2rem;
+    cursor: pointer;
+    transition: all 0.2s;
+  }
+  .btn-primary:active { transform: scale(0.97); }
+
+  .btn-secondary {
+    padding: 14px;
+    border-radius: 18px;
+    border: 2px solid rgba(255,255,255,0.15);
+    background: rgba(255,255,255,0.05);
+    color: var(--white);
+    font-family: 'Fredoka One', cursive;
+    font-size: 1.1rem;
+    cursor: pointer;
+    transition: all 0.2s;
+  }
+  .btn-secondary:active { transform: scale(0.97); }
+
+  /* ===== WALLET SCREEN ===== */
+  .wallet-big-coin {
+    font-size: 6rem;
+    animation: float 2.5s ease-in-out infinite;
+    margin: 16px 0;
+    display: block;
+    filter: drop-shadow(0 0 20px rgba(255,215,0,0.5));
+  }
+  .wallet-total {
+    font-family: 'Fredoka One', cursive;
+    font-size: 3.5rem;
+    color: var(--gold);
+    margin-bottom: 4px;
+  }
+  .wallet-label { color: rgba(240,234,255,0.6); margin-bottom: 24px; }
+
+  .reset-btn {
+    background: none;
+    border: 1px solid rgba(255,70,70,0.35);
+    color: rgba(255,100,100,0.7);
+    border-radius: 12px;
+    padding: 10px 20px;
+    font-family: 'Rubik', sans-serif;
+    font-size: 0.85rem;
+    cursor: pointer;
+    margin-top: 16px;
+    transition: all 0.2s;
+  }
+  .reset-btn:active { transform: scale(0.97); }
+
+  /* ===== MISC ===== */
+  .back-btn {
+    background: none;
+    border: none;
+    color: rgba(240,234,255,0.5);
+    font-size: 1rem;
+    cursor: pointer;
+    padding: 8px 0;
+    font-family: 'Rubik', sans-serif;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    align-self: flex-start;
+    margin-bottom: 8px;
+  }
+
+  .section-title {
+    font-family: 'Fredoka One', cursive;
+    font-size: 1.5rem;
+    color: var(--gold-light);
+    margin-bottom: 20px;
+    text-align: center;
+    width: 100%;
+  }
+
+  .correct-answer-hint {
+    font-size: 0.85rem;
+    color: rgba(240,234,255,0.4);
+    text-align: center;
+    margin-top: 8px;
+  }
+
+  /* Confetti particle */
+  .confetti { position: fixed; pointer-events: none; z-index: 201; }
+  @keyframes confetti-fall {
+    0% { transform: translateY(-20px) rotate(0deg); opacity: 1; }
+    100% { transform: translateY(110vh) rotate(720deg); opacity: 0; }
+  }
+</style>
+</head>
+<body>
+
+<div class="stars" id="stars"></div>
+<div class="coin-rain" id="coinRain"></div>
+<div class="feedback-overlay" id="feedbackOverlay">
+  <div class="feedback-emoji" id="feedbackEmoji"></div>
+  <div class="feedback-text" id="feedbackText"></div>
+</div>
+
+<div class="app">
+  <!-- HEADER -->
+  <div class="header">
+    <div class="header-title">🌟 לוח הכפל</div>
+    <div class="coin-display" onclick="showScreen('wallet')">
+      <span class="coin-icon">🪙</span>
+      <span class="coin-count" id="headerCoins">0</span>
+    </div>
+  </div>
+
+  <!-- HOME SCREEN -->
+  <div class="screen active" id="screen-home">
+    <div class="home-hero">
+      <span class="emoji">🚀</span>
+      <h2>משחק לוח הכפל</h2>
+      <p>ענה נכון, קבל מטבע!<br>כל מטבע נשמר עד הפעם הבאה</p>
+    </div>
+
+    <div class="table-select-label">בחר לוח כפל לתרגול:</div>
+    <div class="table-grid" id="tableGrid"></div>
+
+    <button class="start-btn" onclick="startGame()">🎮 התחל משחק!</button>
+  </div>
+
+  <!-- GAME SCREEN -->
+  <div class="screen" id="screen-game">
+    <div class="progress-bar-wrap">
+      <div class="progress-bar-fill" id="progressBar" style="width:0%"></div>
+    </div>
+
+    <div class="question-card">
+      <div class="question-num-label" id="questionNumLabel">שאלה 1 מתוך 10</div>
+      <div class="question-text" id="questionText">3 <span class="question-eq">×</span> 4 = ?</div>
+      <div class="streak-badge hidden" id="streakBadge">🔥 רצף: 0</div>
+    </div>
+
+    <div class="answers-grid" id="answersGrid"></div>
+    <div class="correct-answer-hint" id="correctHint"></div>
+
+    <button class="skip-btn" onclick="skipQuestion()">דלג על שאלה זו</button>
+  </div>
+
+  <!-- RESULTS SCREEN -->
+  <div class="screen" id="screen-results">
+    <div class="results-card">
+      <span class="results-crown" id="resultsCrown">🏆</span>
+      <div class="results-title" id="resultsTitle">כל הכבוד!</div>
+      <div class="results-stats">
+        <div class="stat-box">
+          <span class="stat-num" id="statCorrect">0</span>
+          <div class="stat-label">✅ תשובות נכונות</div>
+        </div>
+        <div class="stat-box">
+          <span class="stat-num" id="statWrong">0</span>
+          <div class="stat-label">❌ תשובות שגויות</div>
+        </div>
+        <div class="stat-box">
+          <span class="stat-num" id="statStreak">0</span>
+          <div class="stat-label">🔥 רצף מקסימלי</div>
+        </div>
+        <div class="stat-box">
+          <span class="stat-num" id="statEarned">0</span>
+          <div class="stat-label">🪙 מטבעות ברצועה זו</div>
+        </div>
+      </div>
+      <div class="total-coins-row">
+        <span class="total-coins-label">סה"כ מטבעות שלך:</span>
+        <span class="total-coins-num" id="totalCoinsDisplay">0</span>
+        <span style="font-size:1.5rem">🪙</span>
+      </div>
+      <div class="coins-earned-note" id="coinsNote">המטבעות נשמרים ומצטברים!</div>
+    </div>
+    <div class="results-btns">
+      <button class="btn-primary" onclick="startGame()">🔄 שחק שוב</button>
+      <button class="btn-secondary" onclick="showScreen('home')">🏠 חזור לבית</button>
+    </div>
+  </div>
+
+  <!-- WALLET SCREEN -->
+  <div class="screen" id="screen-wallet">
+    <button class="back-btn" onclick="showScreen('home')">← חזרה</button>
+    <div class="section-title">הארנק שלי</div>
+    <span class="wallet-big-coin">🪙</span>
+    <div class="wallet-total" id="walletTotal">0</div>
+    <div class="wallet-label">מטבעות שנצברו</div>
+
+    <div class="results-card" style="margin-top:8px;padding:20px">
+      <div style="font-size:0.9rem;color:rgba(240,234,255,0.6);line-height:1.7">
+        🪙 כל תשובה נכונה = מטבע אחד<br>
+        ❌ תשובה שגויה = אין מטבע<br>
+        🏆 המטבעות נשמרים לתמיד!
+      </div>
+    </div>
+
+    <button class="reset-btn" onclick="resetCoins()">🗑️ אפס את המטבעות</button>
+  </div>
+</div>
+
+<script>
+// ===== STATE =====
+const STORAGE_KEY = 'multiplication_coins_v2';
+
+let totalCoins = parseInt(localStorage.getItem(STORAGE_KEY) || '0');
+let selectedTables = [2];
+let questions = [];
+let currentQ = 0;
+let correct = 0;
+let wrong = 0;
+let streak = 0;
+let maxStreak = 0;
+let sessionCoins = 0;
+let answered = false;
+let feedbackTimer = null;
+
+// ===== SOUNDS =====
+let audioCtx = null;
+function getAudio() {
+  if (!audioCtx) audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+  return audioCtx;
+}
+
+function playCoinSound() {
+  try {
+    const ctx = getAudio();
+    const notes = [523, 659, 784, 1047]; // C5 E5 G5 C6
+    notes.forEach((freq, i) => {
+      const osc = ctx.createOscillator();
+      const gain = ctx.createGain();
+      osc.connect(gain);
+      gain.connect(ctx.destination);
+      osc.type = 'sine';
+      osc.frequency.setValueAtTime(freq, ctx.currentTime + i * 0.08);
+      gain.gain.setValueAtTime(0, ctx.currentTime + i * 0.08);
+      gain.gain.linearRampToValueAtTime(0.22, ctx.currentTime + i * 0.08 + 0.01);
+      gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + i * 0.08 + 0.18);
+      osc.start(ctx.currentTime + i * 0.08);
+      osc.stop(ctx.currentTime + i * 0.08 + 0.2);
+    });
+  } catch(e) {}
+}
+
+function playSadSound() {
+  try {
+    const ctx = getAudio();
+    const notes = [392, 349, 330, 294]; // G4 F4 E4 D4 descending
+    notes.forEach((freq, i) => {
+      const osc = ctx.createOscillator();
+      const gain = ctx.createGain();
+      osc.connect(gain);
+      gain.connect(ctx.destination);
+      osc.type = 'triangle';
+      osc.frequency.setValueAtTime(freq, ctx.currentTime + i * 0.12);
+      gain.gain.setValueAtTime(0, ctx.currentTime + i * 0.12);
+      gain.gain.linearRampToValueAtTime(0.18, ctx.currentTime + i * 0.12 + 0.02);
+      gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + i * 0.12 + 0.22);
+      osc.start(ctx.currentTime + i * 0.12);
+      osc.stop(ctx.currentTime + i * 0.12 + 0.25);
+    });
+  } catch(e) {}
+}
+
+// ===== STARS =====
+(function createStars() {
+  const c = document.getElementById('stars');
+  for (let i = 0; i < 60; i++) {
+    const s = document.createElement('div');
+    s.className = 'star';
+    const size = Math.random() * 2.5 + 0.5;
+    s.style.cssText = `
+      width:${size}px; height:${size}px;
+      left:${Math.random()*100}%;
+      top:${Math.random()*100}%;
+      --d:${Math.random()*3+1.5}s;
+      animation-delay:${Math.random()*3}s;
+    `;
+    c.appendChild(s);
+  }
+})();
+
+// ===== INIT TABLE GRID =====
+function initTableGrid() {
+  const grid = document.getElementById('tableGrid');
+  grid.innerHTML = '';
+
+  // All button
+  const allBtn = document.createElement('button');
+  allBtn.className = 'btn-all' + (selectedTables.length === 9 ? ' selected' : '');
+  allBtn.textContent = '🌈 כל הלוחות';
+  allBtn.onclick = () => {
+    if (selectedTables.length === 9) {
+      selectedTables = [2];
+    } else {
+      selectedTables = [2,3,4,5,6,7,8,9,10];
+    }
+    initTableGrid();
+  };
+  grid.appendChild(allBtn);
+
+  for (let i = 2; i <= 10; i++) {
+    const btn = document.createElement('button');
+    btn.className = 'table-btn' + (selectedTables.includes(i) ? ' selected' : '');
+    btn.innerHTML = `<span class="star-badge">⭐</span>${i}`;
+    btn.onclick = () => toggleTable(i);
+    grid.appendChild(btn);
+  }
+  updateHeader();
+}
+
+function toggleTable(n) {
+  if (selectedTables.includes(n)) {
+    if (selectedTables.length === 1) return;
+    selectedTables = selectedTables.filter(x => x !== n);
+  } else {
+    selectedTables.push(n);
+  }
+  initTableGrid();
+}
+
+// ===== GENERATE QUESTIONS =====
+function generateQuestions() {
+  const pool = [];
+  selectedTables.forEach(t => {
+    for (let i = 2; i <= 10; i++) {
+      pool.push({ a: t, b: i, ans: t * i });
+    }
+  });
+  // Shuffle and pick 10
+  for (let i = pool.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [pool[i], pool[j]] = [pool[j], pool[i]];
+  }
+  return pool.slice(0, 10);
+}
+
+function generateChoices(correctAns) {
+  const choices = new Set([correctAns]);
+  const range = Math.max(5, Math.floor(correctAns * 0.4));
+  let attempts = 0;
+  while (choices.size < 4 && attempts < 50) {
+    const delta = Math.floor(Math.random() * range * 2) - range;
+    const c = correctAns + delta;
+    if (c > 0 && c !== correctAns) choices.add(c);
+    attempts++;
+  }
+  // fallback
+  [correctAns - 2, correctAns + 2, correctAns - 4, correctAns + 4].forEach(v => {
+    if (v > 0 && choices.size < 4) choices.add(v);
+  });
+  return [...choices].sort(() => Math.random() - 0.5).slice(0, 4);
+}
+
+// ===== START GAME =====
+function startGame() {
+  questions = generateQuestions();
+  currentQ = 0;
+  correct = 0;
+  wrong = 0;
+  streak = 0;
+  maxStreak = 0;
+  sessionCoins = 0;
+  answered = false;
+  showScreen('game');
+  renderQuestion();
+}
+
+function renderQuestion() {
+  if (currentQ >= questions.length) {
+    showResults();
+    return;
+  }
+  answered = false;
+  const q = questions[currentQ];
+  const total = questions.length;
+
+  document.getElementById('questionNumLabel').textContent = `שאלה ${currentQ + 1} מתוך ${total}`;
+  document.getElementById('questionText').innerHTML = `${q.a} <span class="question-eq">×</span> ${q.b} <span class="question-eq">=</span> ?`;
+  document.getElementById('progressBar').style.width = `${(currentQ / total) * 100}%`;
+  document.getElementById('correctHint').textContent = '';
+
+  // streak
+  const sb = document.getElementById('streakBadge');
+  if (streak >= 2) {
+    sb.classList.remove('hidden');
+    sb.textContent = `🔥 רצף: ${streak}`;
+  } else {
+    sb.classList.add('hidden');
+  }
+
+  // choices
+  const choices = generateChoices(q.ans);
+  const grid = document.getElementById('answersGrid');
+  grid.innerHTML = '';
+  choices.forEach(c => {
+    const btn = document.createElement('button');
+    btn.className = 'answer-btn';
+    btn.textContent = c;
+    btn.onclick = () => checkAnswer(c, q.ans, btn);
+    grid.appendChild(btn);
+  });
+}
+
+function checkAnswer(chosen, correct_ans, btn) {
+  if (answered) return;
+  answered = true;
+
+  const allBtns = document.querySelectorAll('.answer-btn');
+
+  if (chosen === correct_ans) {
+    btn.classList.add('correct');
+    correct++;
+    streak++;
+    if (streak > maxStreak) maxStreak = streak;
+
+    // coins based on streak
+    let coinsEarned = 1;
+
+    sessionCoins += coinsEarned;
+    totalCoins += coinsEarned;
+    saveCoin();
+    updateHeader();
+
+    // feedback
+    const msgs = ['מצוין! 🌟', 'כל הכבוד! 💪', 'נכון מאוד! ✨', 'אלוף! 🏆', 'מדהים! 🎉'];
+    showFeedback(msgs[Math.floor(Math.random() * msgs.length)], '🎊');
+    playCoinSound();
+    spawnCoinRain(coinsEarned);
+
+    setTimeout(() => {
+      currentQ++;
+      renderQuestion();
+    }, 900);
+
+  } else {
+    btn.classList.add('wrong');
+    wrong++;
+    streak = 0;
+
+    // show correct
+    allBtns.forEach(b => {
+      if (parseInt(b.textContent) === correct_ans) {
+        b.classList.add('correct');
+      }
+    });
+    document.getElementById('correctHint').textContent = `התשובה הנכונה היא ${correct_ans}`;
+    playSadSound();
+    showFeedback('לא נורא, תנסה שוב! 💙', '😅');
+
+    setTimeout(() => {
+      currentQ++;
+      renderQuestion();
+    }, 1400);
+  }
+}
+
+function skipQuestion() {
+  if (answered) return;
+  wrong++;
+  streak = 0;
+  currentQ++;
+  renderQuestion();
+}
+
+// ===== FEEDBACK =====
+function showFeedback(text, emoji) {
+  const ov = document.getElementById('feedbackOverlay');
+  document.getElementById('feedbackEmoji').textContent = emoji;
+  document.getElementById('feedbackText').textContent = text;
+  ov.classList.add('show');
+  if (feedbackTimer) clearTimeout(feedbackTimer);
+  feedbackTimer = setTimeout(() => ov.classList.remove('show'), 800);
+}
+
+// ===== COIN RAIN =====
+function spawnCoinRain(count) {
+  const container = document.getElementById('coinRain');
+  for (let i = 0; i < Math.min(count * 4, 12); i++) {
+    setTimeout(() => {
+      const p = document.createElement('div');
+      p.className = 'coin-particle';
+      p.textContent = '🪙';
+      p.style.cssText = `
+        left: ${10 + Math.random() * 80}%;
+        --speed: ${0.8 + Math.random() * 0.8}s;
+        --rot: ${Math.random() * 720 - 360}deg;
+        animation-delay: ${Math.random() * 0.3}s;
+      `;
+      container.appendChild(p);
+      setTimeout(() => p.remove(), 2000);
+    }, i * 60);
+  }
+}
+
+// ===== RESULTS =====
+function showResults() {
+  // No bonus coins - 1 coin per correct answer only
+
+  document.getElementById('statCorrect').textContent = correct;
+  document.getElementById('statWrong').textContent = wrong;
+  document.getElementById('statStreak').textContent = maxStreak;
+  document.getElementById('statEarned').textContent = sessionCoins;
+  document.getElementById('totalCoinsDisplay').textContent = totalCoins;
+
+  const pct = Math.round((correct / questions.length) * 100);
+  let crown = '🏆', title = 'כל הכבוד!';
+  if (pct === 100) { crown = '👑'; title = 'מושלם! אלוף אמיתי!'; }
+  else if (pct >= 80) { crown = '🥇'; title = 'כל הכבוד!'; }
+  else if (pct >= 60) { crown = '🥈'; title = 'טוב מאוד!'; }
+  else { crown = '💙'; title = 'תמשיך להתאמן!'; }
+
+  if (wrong === 0) crown = '👑';
+
+  document.getElementById('resultsCrown').textContent = crown;
+  document.getElementById('resultsTitle').textContent = title;
+
+  let note = 'המטבעות נשמרים ומצטברים!';
+  document.getElementById('coinsNote').textContent = note;
+
+  showScreen('results');
+
+  if (pct >= 80) {
+    setTimeout(() => spawnCoinRain(sessionCoins), 400);
+  }
+}
+
+// ===== SCREENS =====
+function showScreen(name) {
+  document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
+  document.getElementById('screen-' + name).classList.add('active');
+  if (name === 'wallet') {
+    document.getElementById('walletTotal').textContent = totalCoins;
+  }
+  if (name === 'home') {
+    initTableGrid();
+  }
+}
+
+// ===== STORAGE =====
+function saveCoin() {
+  localStorage.setItem(STORAGE_KEY, totalCoins.toString());
+}
+
+function updateHeader() {
+  document.getElementById('headerCoins').textContent = totalCoins;
+}
+
+function resetCoins() {
+  if (confirm('האם אתה בטוח שברצונך לאפס את כל המטבעות?')) {
+    totalCoins = 0;
+    saveCoin();
+    updateHeader();
+    document.getElementById('walletTotal').textContent = 0;
+  }
+}
+
+// ===== INIT =====
+initTableGrid();
+updateHeader();
+</script>
+</body>
+</html>
